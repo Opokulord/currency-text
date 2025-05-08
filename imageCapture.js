@@ -16,10 +16,136 @@ function captureFromCamera() {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     const overlay = document.createElement('div');
+    const gridOverlay = document.createElement('div');
+    const focusIndicator = document.createElement('div');
+    const settingsMenu = document.createElement('div');
+    const stabilizerIndicator = document.createElement('div');
 
     const captureBtn = document.createElement('button');
     const cancelBtn = document.createElement('button');
     const switchCameraBtn = document.createElement('button');
+    const flashBtn = document.createElement('button');
+    const zoomControls = document.createElement('div');
+    const loadingIndicator = document.createElement('div');
+    const settingsBtn = document.createElement('button');
+    const gridBtn = document.createElement('button');
+    const focusBtn = document.createElement('button');
+    const stabilizerBtn = document.createElement('button');
+
+    // Grid overlay
+    gridOverlay.style = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        display: none;
+    `;
+    gridOverlay.innerHTML = `
+        <div style="
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(to right, transparent 33.33%, rgba(255,255,255,0.2) 33.33%, rgba(255,255,255,0.2) 66.66%, transparent 66.66%),
+                linear-gradient(to bottom, transparent 33.33%, rgba(255,255,255,0.2) 33.33%, rgba(255,255,255,0.2) 66.66%, transparent 66.66%);
+        "></div>
+    `;
+
+    // Focus indicator
+    focusIndicator.style = `
+        position: absolute;
+        width: 60px;
+        height: 60px;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        display: none;
+        pointer-events: none;
+        animation: focusPulse 1s infinite;
+    `;
+
+    // Settings menu
+    settingsMenu.style = `
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(0,0,0,0.8);
+        border-radius: 10px;
+        padding: 15px;
+        display: none;
+        z-index: 1000;
+    `;
+
+    // Stabilizer indicator
+    stabilizerIndicator.style = `
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 14px;
+        display: none;
+    `;
+    stabilizerIndicator.textContent = '📷 Stabilizing...';
+
+    // Loading indicator
+    loadingIndicator.innerHTML = `
+        <div style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        ">
+            <div style="
+                width: 40px;
+                height: 40px;
+                border: 4px solid #f3f3f3;
+                border-top: 4px solid #3498db;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 10px;
+            "></div>
+            <p>Initializing camera...</p>
+        </div>
+    `;
+    loadingIndicator.style = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        z-index: 10000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    `;
+    document.body.appendChild(loadingIndicator);
+
+    // Add CSS animations
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes focusPulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
 
     overlay.style = `
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -32,8 +158,13 @@ function captureFromCamera() {
     video.style = `
         max-width: 90%; border-radius: 10px;
         box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        position: relative;
     `;
     overlay.appendChild(video);
+    overlay.appendChild(gridOverlay);
+    overlay.appendChild(focusIndicator);
+    overlay.appendChild(settingsMenu);
+    overlay.appendChild(stabilizerIndicator);
 
     // Camera controls container
     const controlsContainer = document.createElement('div');
@@ -45,6 +176,83 @@ function captureFromCamera() {
         align-items: center;
     `;
 
+    // Zoom controls
+    zoomControls.style = `
+        display: flex;
+        gap: 10px;
+        margin-bottom: 10px;
+    `;
+    const zoomInBtn = document.createElement('button');
+    const zoomOutBtn = document.createElement('button');
+    zoomInBtn.textContent = '🔍+';
+    zoomOutBtn.textContent = '🔍-';
+    [zoomInBtn, zoomOutBtn].forEach(btn => {
+        btn.style = `
+            padding: 8px 16px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            background-color: #6c757d;
+            color: white;
+            cursor: pointer;
+        `;
+        btn.setAttribute('aria-label', btn.textContent === '🔍+' ? 'Zoom in' : 'Zoom out');
+    });
+    zoomControls.appendChild(zoomOutBtn);
+    zoomControls.appendChild(zoomInBtn);
+
+    // Settings button
+    settingsBtn.textContent = '⚙️ Settings';
+    settingsBtn.style = `
+        padding: 10px 20px;
+        font-size: 16px;
+        border: none;
+        border-radius: 8px;
+        background-color: #6c757d;
+        color: white;
+        cursor: pointer;
+    `;
+    settingsBtn.setAttribute('aria-label', 'Camera settings');
+
+    // Grid button
+    gridBtn.textContent = '📏 Grid';
+    gridBtn.style = `
+        padding: 10px 20px;
+        font-size: 16px;
+        border: none;
+        border-radius: 8px;
+        background-color: #6c757d;
+        color: white;
+        cursor: pointer;
+    `;
+    gridBtn.setAttribute('aria-label', 'Toggle grid overlay');
+
+    // Focus button
+    focusBtn.textContent = '🎯 Focus';
+    focusBtn.style = `
+        padding: 10px 20px;
+        font-size: 16px;
+        border: none;
+        border-radius: 8px;
+        background-color: #6c757d;
+        color: white;
+        cursor: pointer;
+    `;
+    focusBtn.setAttribute('aria-label', 'Toggle auto focus');
+
+    // Stabilizer button
+    stabilizerBtn.textContent = '📷 Stabilizer';
+    stabilizerBtn.style = `
+        padding: 10px 20px;
+        font-size: 16px;
+        border: none;
+        border-radius: 8px;
+        background-color: #6c757d;
+        color: white;
+        cursor: pointer;
+    `;
+    stabilizerBtn.setAttribute('aria-label', 'Toggle image stabilization');
+
     captureBtn.textContent = '📸 Capture';
     captureBtn.style = `
         padding: 12px 24px;
@@ -53,6 +261,7 @@ function captureFromCamera() {
         background-color: #28a745; color: white;
         cursor: pointer; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
     `;
+    captureBtn.setAttribute('aria-label', 'Capture photo');
 
     switchCameraBtn.textContent = '🔄 Switch Camera';
     switchCameraBtn.style = `
@@ -62,6 +271,17 @@ function captureFromCamera() {
         background-color: #007bff;
         color: white; cursor: pointer;
     `;
+    switchCameraBtn.setAttribute('aria-label', 'Switch between front and back camera');
+
+    flashBtn.textContent = '⚡ Flash';
+    flashBtn.style = `
+        padding: 10px 20px;
+        font-size: 16px;
+        border: none; border-radius: 8px;
+        background-color: #ffc107;
+        color: black; cursor: pointer;
+    `;
+    flashBtn.setAttribute('aria-label', 'Toggle flash');
 
     cancelBtn.textContent = '✖ Cancel';
     cancelBtn.style = `
@@ -70,15 +290,33 @@ function captureFromCamera() {
         color: white; border: none; border-radius: 8px;
         cursor: pointer;
     `;
+    cancelBtn.setAttribute('aria-label', 'Close camera');
 
+    controlsContainer.appendChild(zoomControls);
     controlsContainer.appendChild(captureBtn);
     controlsContainer.appendChild(switchCameraBtn);
+    controlsContainer.appendChild(flashBtn);
+    controlsContainer.appendChild(settingsBtn);
+    controlsContainer.appendChild(gridBtn);
+    controlsContainer.appendChild(focusBtn);
+    controlsContainer.appendChild(stabilizerBtn);
     controlsContainer.appendChild(cancelBtn);
     overlay.appendChild(controlsContainer);
     document.body.appendChild(overlay);
 
     let currentFacingMode = 'environment'; // Start with back camera
     let stream = null;
+    let currentZoom = 1;
+    let isFlashOn = false;
+    let isGridOn = false;
+    let isAutoFocusOn = true;
+    let isStabilizerOn = false;
+    let lastTapTime = 0;
+    let lastTapX = 0;
+    let lastTapY = 0;
+
+    // Check if device is mobile
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
     async function startCamera() {
         try {
@@ -86,25 +324,121 @@ function captureFromCamera() {
                 stream.getTracks().forEach(track => track.stop());
             }
 
-            stream = await navigator.mediaDevices.getUserMedia({
+            const constraints = {
                 video: {
-                    facingMode: currentFacingMode
+                    facingMode: currentFacingMode,
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                    zoom: currentZoom
                 }
-            });
+            };
+
+            // Add torch/flash support for mobile devices
+            if (isMobile) {
+                constraints.video.torch = isFlashOn;
+            }
+
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = stream;
+            loadingIndicator.remove();
+
+            // Start image stabilization if enabled
+            if (isStabilizerOn) {
+                startImageStabilization();
+            }
         } catch (error) {
             console.error('Error accessing camera:', error);
             alert('Error accessing camera. Please make sure you have granted camera permissions.');
             document.body.removeChild(overlay);
+            loadingIndicator.remove();
         }
     }
 
     // Start with back camera
     startCamera();
 
+    // Settings menu toggle
+    settingsBtn.onclick = () => {
+        settingsMenu.style.display = settingsMenu.style.display === 'none' ? 'block' : 'none';
+    };
+
+    // Grid toggle
+    gridBtn.onclick = () => {
+        isGridOn = !isGridOn;
+        gridOverlay.style.display = isGridOn ? 'block' : 'none';
+        gridBtn.style.backgroundColor = isGridOn ? '#28a745' : '#6c757d';
+    };
+
+    // Focus toggle
+    focusBtn.onclick = () => {
+        isAutoFocusOn = !isAutoFocusOn;
+        focusBtn.style.backgroundColor = isAutoFocusOn ? '#28a745' : '#6c757d';
+    };
+
+    // Stabilizer toggle
+    stabilizerBtn.onclick = () => {
+        isStabilizerOn = !isStabilizerOn;
+        stabilizerBtn.style.backgroundColor = isStabilizerOn ? '#28a745' : '#6c757d';
+        if (isStabilizerOn) {
+            startImageStabilization();
+        } else {
+            stabilizerIndicator.style.display = 'none';
+        }
+    };
+
+    // Image stabilization
+    function startImageStabilization() {
+        stabilizerIndicator.style.display = 'block';
+        setTimeout(() => {
+            stabilizerIndicator.style.display = 'none';
+        }, 2000);
+    }
+
+    // Tap to focus
+    video.addEventListener('click', (e) => {
+        if (!isAutoFocusOn) return;
+        
+        const rect = video.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        focusIndicator.style.left = `${x - 30}px`;
+        focusIndicator.style.top = `${y - 30}px`;
+        focusIndicator.style.display = 'block';
+        
+        setTimeout(() => {
+            focusIndicator.style.display = 'none';
+        }, 1000);
+    });
+
     switchCameraBtn.onclick = () => {
         currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
         startCamera();
+    };
+
+    flashBtn.onclick = async () => {
+        if (isMobile) {
+            isFlashOn = !isFlashOn;
+            flashBtn.style.backgroundColor = isFlashOn ? '#28a745' : '#ffc107';
+            flashBtn.textContent = isFlashOn ? '⚡ Flash On' : '⚡ Flash Off';
+            startCamera();
+        } else {
+            alert('Flash is only available on mobile devices');
+        }
+    };
+
+    zoomInBtn.onclick = () => {
+        if (currentZoom < 4) {
+            currentZoom += 0.5;
+            startCamera();
+        }
+    };
+
+    zoomOutBtn.onclick = () => {
+        if (currentZoom > 1) {
+            currentZoom -= 0.5;
+            startCamera();
+        }
     };
 
     captureBtn.onclick = () => {
@@ -125,7 +459,35 @@ function captureFromCamera() {
             stream.getTracks().forEach(track => track.stop());
         }
         document.body.removeChild(overlay);
+        loadingIndicator.remove();
     };
+
+    // Keyboard accessibility
+    overlay.addEventListener('keydown', (e) => {
+        switch(e.key) {
+            case 'Escape':
+                cancelBtn.click();
+                break;
+            case 'Enter':
+                captureBtn.click();
+                break;
+            case 'f':
+                flashBtn.click();
+                break;
+            case 'g':
+                gridBtn.click();
+                break;
+            case 's':
+                settingsBtn.click();
+                break;
+            case '+':
+                zoomInBtn.click();
+                break;
+            case '-':
+                zoomOutBtn.click();
+                break;
+        }
+    });
 }
 
 // === OCR Processing with Enhanced Currency Extraction ===
